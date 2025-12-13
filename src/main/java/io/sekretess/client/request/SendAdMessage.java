@@ -2,11 +2,11 @@ package io.sekretess.client.request;
 
 public class SendAdMessage {
     private String text;
-    private String businessExchange;
+    private String businessName;
 
-    public SendAdMessage(String text, String businessExchange) {
+    public SendAdMessage(String text, String businessName) {
         this.text = text;
-        this.businessExchange = businessExchange;
+        this.businessName = businessName;
     }
 
     public String getText() {
@@ -17,11 +17,11 @@ public class SendAdMessage {
         this.text = text;
     }
 
-    public String getBusinessExchange() {
-        return businessExchange;
+    public String getBusinessName() {
+        return businessName;
     }
 
-    public void setBusinessExchange(String businessExchange) {
-        this.businessExchange = businessExchange;
+    public void setBusinessName(String businessName) {
+        this.businessName = businessName;
     }
 }

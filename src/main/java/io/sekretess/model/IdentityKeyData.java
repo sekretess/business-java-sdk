@@ -1,4 +1,3 @@
 package io.sekretess.model;
 
-public class IdentityKeyData {
-}
+public record IdentityKeyData(byte[] serializedIdentityKeyPair, int registrationId) {}
