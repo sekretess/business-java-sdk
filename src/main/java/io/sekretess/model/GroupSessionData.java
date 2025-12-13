@@ -1,4 +1,3 @@
 package io.sekretess.model;
 
-public class GroupSessionData {
-}
+public record GroupSessionData(String name, int deviceId, String distributionId, String sessionRecord) {}

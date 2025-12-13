@@ -1,4 +1,3 @@
 package io.sekretess.model;
 
-public class SessionData {
-}
+public record SessionData(String name, int deviceId, String base64SessionRecord) {}

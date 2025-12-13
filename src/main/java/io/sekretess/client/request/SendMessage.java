@@ -2,18 +2,13 @@ package io.sekretess.client.request;
 
 public class SendMessage {
     private String text;
-    private String consumerExchange;
+    private String consumerName;
     private String type;
 
-    public SendMessage(String text, String consumerExchange) {
+    public SendMessage(String text, String consumerName, String type) {
         this.text = text;
-        this.consumerExchange = consumerExchange;
-    }
-
-    public SendMessage(String text, String consumerExchange,String type) {
-        this.text = text;
-        this.consumerExchange = consumerExchange;
-        this.type=type;
+        this.consumerName = consumerName;
+        this.type = type;
     }
 
     public String getType() {
@@ -32,11 +27,11 @@ public class SendMessage {
         this.text = text;
     }
 
-    public String getConsumerExchange() {
-        return consumerExchange;
+    public String getConsumerName() {
+        return consumerName;
     }
 
-    public void setConsumerExchange(String consumerExchange) {
-        this.consumerExchange = consumerExchange;
+    public void setConsumerName(String consumerName) {
+        this.consumerName = consumerName;
     }
 }

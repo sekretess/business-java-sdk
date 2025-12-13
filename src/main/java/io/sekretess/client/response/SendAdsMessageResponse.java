@@ -1,4 +1,3 @@
 package io.sekretess.client.response;
 
-public record SendAdsMessageResponse() {
-}
+public record SendAdsMessageResponse(String consumerName) {}
