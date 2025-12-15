@@ -33,8 +33,14 @@ public class SekretessManager {
     private final String userName = System.getenv("BUSINESS_USER_NAME");
 
     public SekretessManager(SekretessSignalProtocolStore signalProtocolStore) {
+        this(signalProtocolStore, new SekretessServerClient());
+    }
+
+
+    SekretessManager(SekretessSignalProtocolStore signalProtocolStore,
+                    SekretessServerClient serverClient) {
         this.signalProtocolStore = signalProtocolStore;
-        this.sekretessServerClient = new SekretessServerClient();
+        this.sekretessServerClient = serverClient;
     }
 
     private void sendMessage(String message, String consumer, MessageType messageType) throws SessionCreationException, MessageSendException, PrekeyBundleException {
