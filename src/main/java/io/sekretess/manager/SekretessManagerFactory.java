@@ -1,8 +1,9 @@
-package io.sekretess.store;
+package io.sekretess.manager;
 
 import io.sekretess.model.GroupSessionData;
 import io.sekretess.model.IdentityKeyData;
 import io.sekretess.model.SessionData;
+import io.sekretess.store.*;
 import org.signal.libsignal.protocol.*;
 import org.signal.libsignal.protocol.ecc.ECKeyPair;
 import org.signal.libsignal.protocol.groups.GroupSessionBuilder;
@@ -17,16 +18,15 @@ import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
-public class SekretessStoreFactory {
+public class SekretessManagerFactory {
 
-    private static final Logger logger = LoggerFactory.getLogger(SekretessStoreFactory.class);
+    private static final Logger logger = LoggerFactory.getLogger(SekretessManagerFactory.class);
     private static final String username = System.getenv("BUSINESS_USER_NAME");
 
-    public static SekretessSignalProtocolStore initialize(
-            IdentityStore identityStore,
-            SessionStore sessionStore,
-            GroupSessionStore groupSessionStore
-    ) throws InvalidKeyException {
+    public static SekretessManager createSekretessManager( IdentityStore identityStore,
+                                                           SessionStore sessionStore,
+                                                           GroupSessionStore groupSessionStore) throws InvalidKeyException {
+
 
         IdentityKeyData identityData = identityStore.loadIdentity(username);
         SekretessSignalProtocolStore sekretessSignalProtocolStore;
@@ -79,6 +79,7 @@ public class SekretessStoreFactory {
                 logger.error("Exception happened when creating senderKeyRecord! {}", e.getMessage(), e);
             }
         }
-        return sekretessSignalProtocolStore;
+
+        return new SekretessManager(sekretessSignalProtocolStore);
     }
 }

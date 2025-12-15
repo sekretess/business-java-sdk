@@ -1,6 +1,5 @@
 package io.sekretess.store;
 
-import io.sekretess.model.GroupSessionData;
 import org.signal.libsignal.protocol.IdentityKeyPair;
 import org.signal.libsignal.protocol.SignalProtocolAddress;
 import org.signal.libsignal.protocol.groups.state.SenderKeyRecord;

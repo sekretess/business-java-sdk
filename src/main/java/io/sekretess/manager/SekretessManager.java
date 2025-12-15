@@ -4,6 +4,9 @@ import io.sekretess.client.SekretessServerClient;
 import io.sekretess.client.response.ConsumerKeysResponse;
 import io.sekretess.client.response.SendAdsMessageResponse;
 import io.sekretess.client.response.SendMessageResponse;
+import io.sekretess.exception.MessageSendException;
+import io.sekretess.exception.PrekeyBundleException;
+import io.sekretess.exception.SessionCreationException;
 import io.sekretess.model.GroupSessionData;
 import io.sekretess.store.SekretessSignalProtocolStore;
 import io.sekretess.util.MessageType;
@@ -30,11 +33,17 @@ public class SekretessManager {
     private final String userName = System.getenv("BUSINESS_USER_NAME");
 
     public SekretessManager(SekretessSignalProtocolStore signalProtocolStore) {
-        this.signalProtocolStore = signalProtocolStore;
-        this.sekretessServerClient = new SekretessServerClient();
+        this(signalProtocolStore, new SekretessServerClient());
     }
 
-    private void sendMessage(String message, String consumer, MessageType messageType) {
+
+    SekretessManager(SekretessSignalProtocolStore signalProtocolStore,
+                    SekretessServerClient serverClient) {
+        this.signalProtocolStore = signalProtocolStore;
+        this.sekretessServerClient = serverClient;
+    }
+
+    private void sendMessage(String message, String consumer, MessageType messageType) throws SessionCreationException, MessageSendException, PrekeyBundleException {
         SignalProtocolAddress consumerAddress = new SignalProtocolAddress(consumer, 123);
         SessionRecord sessionRecord = signalProtocolStore.loadSession(consumerAddress);
         if (sessionRecord == null) {
@@ -45,8 +54,7 @@ public class SekretessManager {
                 sessionBuilder.process(consumerPrekeyBundle);
                 sessionRecord = signalProtocolStore.loadSession(consumerAddress);
             } catch (InvalidKeyException | UntrustedIdentityException e) {
-                logger.error("Exception happened when trying to create session with consumer: {} , {}", consumer, e.getMessage(), e);
-                throw new RuntimeException(e);
+                throw new SessionCreationException("Exception happened when trying to create session with consumer: " + consumer + " , " + e.getMessage());
             }
         }
 
@@ -62,14 +70,15 @@ public class SekretessManager {
             }
         } catch (Exception e) {
             logger.error("Exception happened when trying to send message! {}", e.getMessage(), e);
+            throw new MessageSendException("Exception happened when trying to send message! " + e.getMessage());
         }
     }
 
-    public void sendMessageToConsumer(String message, String consumer) {
+    public void sendMessageToConsumer(String message, String consumer) throws SessionCreationException, MessageSendException, PrekeyBundleException {
         this.sendMessage(message, consumer, MessageType.PRIVATE);
     }
 
-    private void handleRetrySendMessage(String message, String consumer, boolean isSubscribedToAdMessages, MessageType messageType) {
+    private void handleRetrySendMessage(String message, String consumer, boolean isSubscribedToAdMessages, MessageType messageType) throws PrekeyBundleException {
         logger.info("Received to retry message to consumer: {}", consumer);
         SignalProtocolAddress consumerAddress = new SignalProtocolAddress(consumer, 123);
         SessionBuilder sessionBuilder = new SessionBuilder(signalProtocolStore, consumerAddress);
@@ -126,7 +135,7 @@ public class SekretessManager {
     }
 
 
-    public void sendAdsMessage(String message) {
+    public void sendAdsMessage(String message) throws MessageSendException {
         try {
             GroupSessionData groupSessionModel = Optional.ofNullable(signalProtocolStore.getGroupSessionStore().loadGroupSession(userName)).orElseThrow();
             GroupCipher groupCipher = new GroupCipher(this.signalProtocolStore, new SignalProtocolAddress(userName, 1));
@@ -141,12 +150,12 @@ public class SekretessManager {
 
         } catch (Exception e) {
             logger.error("Exception happened when sending ads message! {}", e.getMessage(), e);
-            throw new RuntimeException(e);
+            throw new MessageSendException("Exception happened when sending ads message! " + e.getMessage());
         }
     }
 
 
-    private PreKeyBundle getConsumerPrekeyBundle(String consumer) {
+    private PreKeyBundle getConsumerPrekeyBundle(String consumer) throws PrekeyBundleException {
         try {
             ConsumerKeysResponse consumerKeysResponse = sekretessServerClient.getConsumerKeys(consumer);
             String signedPreKey = consumerKeysResponse.spk();
@@ -179,8 +188,7 @@ public class SekretessManager {
                     pqSignedPrekeySignature);
 
         } catch (Exception e) {
-            logger.error("Exception happened when creating prekeybundle! {}", e.getMessage(), e);
-            throw new RuntimeException("Exception happened when creating prekeybundle! " + e.getMessage());
+            throw new PrekeyBundleException("Exception happened when trying to get consumer prekey bundle: " + consumer + " , " + e.getMessage());
         }
     }
 
