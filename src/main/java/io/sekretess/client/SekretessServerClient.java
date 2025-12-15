@@ -7,7 +7,6 @@ import io.sekretess.client.request.SendMessage;
 import io.sekretess.client.response.ConsumerKeysResponse;
 import io.sekretess.client.response.SendAdsMessageResponse;
 import io.sekretess.client.response.SendMessageResponse;
-import io.sekretess.util.TokenProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,8 +20,7 @@ import java.util.List;
 
 public class SekretessServerClient {
     private final HttpClient httpClient;
-    private final String businessServerUrl=System.getenv("SEKRETESS_BUSINESS_SERVER_URL");
-    private final String consumerServerUrl=System.getenv("SEKRETESS_CONSUMER_SERVER_URL");
+    private final String businessServerUrl = System.getenv("SEKRETESS_BUSINESS_SERVER_URL");
     private final TokenProvider tokenProvider;
     private static final Logger logger = LoggerFactory.getLogger(SekretessServerClient.class);
 
@@ -75,7 +73,7 @@ public class SekretessServerClient {
     public ConsumerKeysResponse getConsumerKeys(String consumer) throws IOException, InterruptedException {
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .GET()
-                .uri(URI.create(consumerServerUrl + "/api/v1/consumers/" + consumer + "/key-bundles"))
+                .uri(URI.create(businessServerUrl + "/api/v1/consumers/" + consumer + "/key-bundles"))
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + tokenProvider.fetchToken())
                 .build();
@@ -87,7 +85,7 @@ public class SekretessServerClient {
             return consumerKeysResponse;
         } else {
             logger.error("Exception happened when getting consumer keys! {}", response.statusCode());
-            throw new RuntimeException("Exception happened! " + response.statusCode());
+            throw new RuntimeException("Exception happened when fetching consumer keys from sekretess! consumer: " + consumer + " statusCode: " + response.statusCode());
         }
     }
 

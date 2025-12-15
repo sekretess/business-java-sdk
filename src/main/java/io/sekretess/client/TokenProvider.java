@@ -1,4 +1,4 @@
-package io.sekretess.util;
+package io.sekretess.client;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
@@ -26,13 +26,12 @@ import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.security.Security;
-import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
-public class TokenProvider {
+class TokenProvider {
 
     private final String idpUrl = System.getenv("IDENTITY_PROVIDER_URL");
     private final String clientId = "business_client";
@@ -50,7 +49,7 @@ public class TokenProvider {
         }
     }
 
-    public TokenProvider() {
+    TokenProvider() {
         this.httpClient = HttpClient.newBuilder().sslContext(createSslContext()).build();
     }
 
@@ -65,8 +64,7 @@ public class TokenProvider {
             PrivateKey privateKey;
             try (PEMParser pemParser = new PEMParser(new FileReader(clientKey))) {
                 Object object = pemParser.readObject();
-                if (object instanceof PKCS8EncryptedPrivateKeyInfo) {
-                    PKCS8EncryptedPrivateKeyInfo encryptedPrivateKeyInfo = (PKCS8EncryptedPrivateKeyInfo) object;
+                if (object instanceof PKCS8EncryptedPrivateKeyInfo encryptedPrivateKeyInfo) {
                     InputDecryptorProvider decryptorProvider =
                             new JceOpenSSLPKCS8DecryptorProviderBuilder()
                                     .build(clientKeyPassword.toCharArray());
@@ -78,10 +76,10 @@ public class TokenProvider {
                 }
             }
 
-            char[] keyStorePassword = PasswordGenerator.generatePassword();
+            char[] keyStorePassword = io.sekretess.util.PasswordGenerator.generatePassword();
             KeyStore keyStore = KeyStore.getInstance("JKS");
             keyStore.load(null, null);
-            keyStore.setKeyEntry("client", privateKey, keyStorePassword, new Certificate[]{certificate});
+            keyStore.setKeyEntry("client", privateKey, keyStorePassword, new java.security.cert.Certificate[]{certificate});
 
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(keyStore, keyStorePassword);
@@ -124,7 +122,7 @@ public class TokenProvider {
             throw new RuntimeException("Failed to get token: " + response.body());
         }
         Gson gson = new Gson();
-        return gson.fromJson(response.body(), TokenObject.class).access_token;
+        return gson.fromJson(response.body(), TokenObject.class).getAccess_token();
     }
 
     public String fetchToken() {
