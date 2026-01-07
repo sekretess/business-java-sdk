@@ -113,7 +113,7 @@ public class SekretessManager {
             GroupSessionData groupSessionModel = Optional.ofNullable(signalProtocolStore.getGroupSessionStore().loadGroupSession(userName)).orElseThrow();
             if (groupSessionModel.sessionRecord() != null) {
                 sentBusinessDistributionMessage =
-                        new SenderKeyDistributionMessage(Base64.getDecoder().decode(groupSessionModel.distributionId()));
+                        new SenderKeyDistributionMessage(Base64.getDecoder().decode(groupSessionModel.businessDistributionMessage()));
             } else {
                 throw new RuntimeException("Group session not found for business!");
             }

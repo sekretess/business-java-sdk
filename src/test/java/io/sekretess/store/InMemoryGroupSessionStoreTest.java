@@ -62,7 +62,7 @@ class InMemoryGroupSessionStoreTest {
         // Assert
         assertThat(loaded).isNotNull();
         assertThat(loaded.name()).isEqualTo(name);
-        assertThat(loaded.sessionRecord()).isEqualTo(message);
+        assertThat(loaded.businessDistributionMessage()).isEqualTo(message);
     }
 
     @Test

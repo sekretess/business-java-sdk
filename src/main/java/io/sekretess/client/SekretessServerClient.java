@@ -40,8 +40,7 @@ public class SekretessServerClient {
 
         HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
-            logger.error("Failed to send text message to consumer! {}", consumer);
-            throw new RuntimeException("Failed to send text message to consumer!" + consumer);
+            throw new RuntimeException("Failed to send text message to consumer!" + consumer + " ,statusCode: " + response.statusCode());
         } else {
             logger.info("Successfully forwarded message for consumer! {}", consumer);
             Gson gson = new Gson();
@@ -53,15 +52,14 @@ public class SekretessServerClient {
     public List<SendAdsMessageResponse> sendAdsMessage(String text, String exchangeName) throws IOException, InterruptedException {
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .POST(HttpRequest.BodyPublishers.ofString(new Gson().toJson(new SendAdMessage(text, exchangeName))))
-                .uri(URI.create(businessServerUrl + "/api/v1/businesses/ads"))
+                .uri(URI.create(businessServerUrl + "/api/v1/businesses/messages/ads"))
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + tokenProvider.fetchToken())
                 .build();
 
         HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 202) {
-            logger.error("Failed to send ads message to exchange! {}", exchangeName);
-            throw new RuntimeException("Failed to send ads message to exchange!" + exchangeName);
+            throw new RuntimeException("Failed to send ads message to exchange! " + exchangeName + " statusCode: " + response.statusCode());
         } else {
             logger.info("Successfully forwarded ads message to exchange! {}", exchangeName);
             Type listType = new TypeToken<List<SendAdsMessageResponse>>() {
@@ -73,7 +71,7 @@ public class SekretessServerClient {
     public ConsumerKeysResponse getConsumerKeys(String consumer) throws IOException, InterruptedException {
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .GET()
-                .uri(URI.create(businessServerUrl + "/api/v1/consumers/" + consumer + "/key-bundles"))
+                .uri(URI.create(businessServerUrl + "/api/v1/businesses/consumers/" + consumer + "/key-bundles"))
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + tokenProvider.fetchToken())
                 .build();
@@ -81,10 +79,9 @@ public class SekretessServerClient {
         if (response.statusCode() == 200) {
             Gson gson = new Gson();
             ConsumerKeysResponse consumerKeysResponse = gson.fromJson(response.body(), ConsumerKeysResponse.class);
-            logger.info("Received response from server for consumer: {}, {}", consumer, consumerKeysResponse);
+            logger.debug("Received response from server for consumer: {}, {}", consumer, consumerKeysResponse);
             return consumerKeysResponse;
         } else {
-            logger.error("Exception happened when getting consumer keys! {}", response.statusCode());
             throw new RuntimeException("Exception happened when fetching consumer keys from sekretess! consumer: " + consumer + " statusCode: " + response.statusCode());
         }
     }

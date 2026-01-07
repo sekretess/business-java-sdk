@@ -18,7 +18,7 @@ class GroupSessionDataTest {
         String sessionRecord = "base64-group-session-record";
 
         // Act
-        GroupSessionData groupSession = new GroupSessionData(name, deviceId, distributionId, sessionRecord);
+        GroupSessionData groupSession = new GroupSessionData(name, deviceId, distributionId, sessionRecord,null);
 
         // Assert
         assertThat(groupSession).isNotNull();
@@ -32,7 +32,7 @@ class GroupSessionDataTest {
     void testNameAccessor() {
         // Arrange
         String name = "test-business";
-        GroupSessionData groupSession = new GroupSessionData(name, 1, "dist-id", "record");
+        GroupSessionData groupSession = new GroupSessionData(name, 1, "dist-id", "record",null);
 
         // Act & Assert
         assertThat(groupSession.name()).isEqualTo(name);
@@ -42,7 +42,7 @@ class GroupSessionDataTest {
     void testDeviceIdAccessor() {
         // Arrange
         int deviceId = 5;
-        GroupSessionData groupSession = new GroupSessionData("business", deviceId, "dist-id", "record");
+        GroupSessionData groupSession = new GroupSessionData("business", deviceId, "dist-id", "record",null);
 
         // Act & Assert
         assertThat(groupSession.deviceId()).isEqualTo(deviceId);
@@ -52,7 +52,7 @@ class GroupSessionDataTest {
     void testDistributionIdAccessor() {
         // Arrange
         String distributionId = "uuid-style-dist-id";
-        GroupSessionData groupSession = new GroupSessionData("business", 1, distributionId, "record");
+        GroupSessionData groupSession = new GroupSessionData("business", 1, distributionId, "record",null);
 
         // Act & Assert
         assertThat(groupSession.distributionId()).isEqualTo(distributionId);
@@ -62,7 +62,7 @@ class GroupSessionDataTest {
     void testSessionRecordAccessor() {
         // Arrange
         String record = "base64-session-data";
-        GroupSessionData groupSession = new GroupSessionData("business", 1, "dist-id", record);
+        GroupSessionData groupSession = new GroupSessionData("business", 1, "dist-id", record,null);
 
         // Act & Assert
         assertThat(groupSession.sessionRecord()).isEqualTo(record);
@@ -71,8 +71,8 @@ class GroupSessionDataTest {
     @Test
     void testEqualityWithSameValues() {
         // Arrange
-        GroupSessionData session1 = new GroupSessionData("business", 1, "dist-1", "record");
-        GroupSessionData session2 = new GroupSessionData("business", 1, "dist-1", "record");
+        GroupSessionData session1 = new GroupSessionData("business", 1, "dist-1", "record",null);
+        GroupSessionData session2 = new GroupSessionData("business", 1, "dist-1", "record",null);
 
         // Act & Assert
         assertThat(session1).isEqualTo(session2);
@@ -81,8 +81,8 @@ class GroupSessionDataTest {
     @Test
     void testInequalityWithDifferentName() {
         // Arrange
-        GroupSessionData session1 = new GroupSessionData("business1", 1, "dist-1", "record");
-        GroupSessionData session2 = new GroupSessionData("business2", 1, "dist-1", "record");
+        GroupSessionData session1 = new GroupSessionData("business1", 1, "dist-1", "record",null);
+        GroupSessionData session2 = new GroupSessionData("business2", 1, "dist-1", "record",null);
 
         // Act & Assert
         assertThat(session1).isNotEqualTo(session2);
@@ -91,8 +91,8 @@ class GroupSessionDataTest {
     @Test
     void testInequalityWithDifferentDistributionId() {
         // Arrange
-        GroupSessionData session1 = new GroupSessionData("business", 1, "dist-1", "record");
-        GroupSessionData session2 = new GroupSessionData("business", 1, "dist-2", "record");
+        GroupSessionData session1 = new GroupSessionData("business", 1, "dist-1", "record",null);
+        GroupSessionData session2 = new GroupSessionData("business", 1, "dist-2", "record",null);
 
         // Act & Assert
         assertThat(session1).isNotEqualTo(session2);
@@ -101,8 +101,8 @@ class GroupSessionDataTest {
     @Test
     void testInequalityWithDifferentSessionRecord() {
         // Arrange
-        GroupSessionData session1 = new GroupSessionData("business", 1, "dist-1", "record1");
-        GroupSessionData session2 = new GroupSessionData("business", 1, "dist-1", "record2");
+        GroupSessionData session1 = new GroupSessionData("business", 1, "dist-1", "record1",null);
+        GroupSessionData session2 = new GroupSessionData("business", 1, "dist-1", "record2",null);
 
         // Act & Assert
         assertThat(session1).isNotEqualTo(session2);
@@ -111,7 +111,7 @@ class GroupSessionDataTest {
     @Test
     void testWithMaxIntDeviceId() {
         // Arrange
-        GroupSessionData session = new GroupSessionData("business", Integer.MAX_VALUE, "dist-id", "record");
+        GroupSessionData session = new GroupSessionData("business", Integer.MAX_VALUE, "dist-id", "record",null);
 
         // Act & Assert
         assertThat(session.deviceId()).isEqualTo(Integer.MAX_VALUE);
@@ -120,7 +120,7 @@ class GroupSessionDataTest {
     @Test
     void testWithZeroDeviceId() {
         // Arrange
-        GroupSessionData session = new GroupSessionData("business", 0, "dist-id", "record");
+        GroupSessionData session = new GroupSessionData("business", 0, "dist-id", "record",null);
 
         // Act & Assert
         assertThat(session.deviceId()).isEqualTo(0);
@@ -129,7 +129,7 @@ class GroupSessionDataTest {
     @Test
     void testWithEmptyRecord() {
         // Arrange
-        GroupSessionData session = new GroupSessionData("business", 1, "dist-id", "");
+        GroupSessionData session = new GroupSessionData("business", 1, "dist-id", "",null);
 
         // Act & Assert
         assertThat(session.sessionRecord()).isEmpty();
