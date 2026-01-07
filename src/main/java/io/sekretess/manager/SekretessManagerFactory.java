@@ -23,9 +23,9 @@ public class SekretessManagerFactory {
     private static final Logger logger = LoggerFactory.getLogger(SekretessManagerFactory.class);
     private static final String username = System.getenv("BUSINESS_USER_NAME");
 
-    public static SekretessManager createSekretessManager( IdentityStore identityStore,
-                                                           SessionStore sessionStore,
-                                                           GroupSessionStore groupSessionStore) throws InvalidKeyException {
+    public static SekretessManager createSekretessManager(IdentityStore identityStore,
+                                                          SessionStore sessionStore,
+                                                          GroupSessionStore groupSessionStore) throws InvalidKeyException {
 
 
         IdentityKeyData identityData = identityStore.loadIdentity(username);
@@ -68,7 +68,7 @@ public class SekretessManagerFactory {
                 String distributionId = UUID.randomUUID().toString();
                 SenderKeyDistributionMessage sentBusinessDistributionMessage = businessSessionBuilder.create(businessAddress, UUID.fromString(distributionId));
                 groupSessionStore.saveSendDistributionMessage(username, 1, distributionId, Base64.getEncoder().encodeToString(sentBusinessDistributionMessage.serialize()));
-                groupSessionData = new GroupSessionData(username, 1, distributionId, Base64.getEncoder().encodeToString(sentBusinessDistributionMessage.serialize()));
+                groupSessionData = new GroupSessionData(username, 1, distributionId, null, Base64.getEncoder().encodeToString(sentBusinessDistributionMessage.serialize()));
             }
             SignalProtocolAddress signalProtocolAddress = new SignalProtocolAddress(groupSessionData.name(), groupSessionData.deviceId());
             SenderKeyRecord senderKeyRecord = null;

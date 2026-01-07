@@ -14,12 +14,12 @@ public class InMemoryGroupSessionStore implements GroupSessionStore {
 
     @Override
     public void saveGroupSession(String name, int deviceId, String distributionId, String sessionRecord) {
-        store.put(name, new GroupSessionData(name, deviceId, distributionId, sessionRecord));
+        store.put(name, new GroupSessionData(name, deviceId, distributionId, sessionRecord, null));
     }
 
     @Override
     public void saveSendDistributionMessage(String name, int deviceId, String distributionId, String businessDistributionMessage) {
-        store.put(name, new GroupSessionData(name, deviceId, distributionId, businessDistributionMessage));
+        store.put(name, new GroupSessionData(name, deviceId, distributionId,null, businessDistributionMessage));
     }
 
     @Override
