@@ -30,9 +30,9 @@ public class SekretessServerClient {
         this.tokenProvider = new TokenProvider();
     }
 
-    public SendMessageResponse sendMessage(String text, String consumer, String type) throws IOException, InterruptedException {
+    public SendMessageResponse sendMessage(String text, String consumer) throws IOException, InterruptedException {
         HttpRequest httpRequest = HttpRequest.newBuilder()
-                .POST(HttpRequest.BodyPublishers.ofString(new Gson().toJson(new SendMessage(text, consumer, type))))
+                .POST(HttpRequest.BodyPublishers.ofString(new Gson().toJson(new SendMessage(text, consumer))))
                 .uri(URI.create(businessServerUrl + "/api/v1/businesses/messages"))
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + tokenProvider.fetchToken())
@@ -47,6 +47,23 @@ public class SekretessServerClient {
             return gson.fromJson(response.body(), SendMessageResponse.class);
         }
 
+    }
+
+
+    public void sendKeyDistMessage(String text, String consumer) throws IOException, InterruptedException {
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofString(new Gson().toJson(new SendMessage(text, consumer))))
+                .uri(URI.create(businessServerUrl + "/api/v1/businesses/messages/distributions"))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + tokenProvider.fetchToken())
+                .build();
+
+        HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("Failed to send key dist message to consumer!" + consumer + " ,statusCode: " + response.statusCode());
+        } else {
+            logger.info("Successfully forwarded key-dist message for consumer! {}", consumer);
+        }
     }
 
     public List<SendAdsMessageResponse> sendAdsMessage(String text, String exchangeName) throws IOException, InterruptedException {
