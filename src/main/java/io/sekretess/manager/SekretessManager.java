@@ -9,7 +9,6 @@ import io.sekretess.exception.PrekeyBundleException;
 import io.sekretess.exception.SessionCreationException;
 import io.sekretess.model.GroupSessionData;
 import io.sekretess.store.SekretessSignalProtocolStore;
-import io.sekretess.util.MessageType;
 import org.signal.libsignal.protocol.*;
 import org.signal.libsignal.protocol.ecc.ECPublicKey;
 import org.signal.libsignal.protocol.groups.GroupCipher;
@@ -38,12 +37,12 @@ public class SekretessManager {
 
 
     SekretessManager(SekretessSignalProtocolStore signalProtocolStore,
-                    SekretessServerClient serverClient) {
+                     SekretessServerClient serverClient) {
         this.signalProtocolStore = signalProtocolStore;
         this.sekretessServerClient = serverClient;
     }
 
-    private void sendMessage(String message, String consumer, MessageType messageType) throws SessionCreationException, MessageSendException, PrekeyBundleException {
+    private void sendMessage(String message, String consumer) throws SessionCreationException, MessageSendException, PrekeyBundleException {
         SignalProtocolAddress consumerAddress = new SignalProtocolAddress(consumer, 123);
         SessionRecord sessionRecord = signalProtocolStore.loadSession(consumerAddress);
         if (sessionRecord == null) {
@@ -62,11 +61,11 @@ public class SekretessManager {
         try {
             CiphertextMessage ciphertextMessage = sessionCipher.encrypt(message.getBytes());
             PreKeySignalMessage signalMessage = new PreKeySignalMessage(ciphertextMessage.serialize());
-            SendMessageResponse sendMessageResponse = sekretessServerClient.sendMessage(Base64.getEncoder().encodeToString(signalMessage.serialize()), consumer, messageType.name());
+            SendMessageResponse sendMessageResponse = sekretessServerClient.sendMessage(Base64.getEncoder().encodeToString(signalMessage.serialize()), consumer);
             IdentityKey idenKey = new IdentityKey(Base64.getDecoder().decode(sendMessageResponse.userIK()));
             if (!Arrays.equals(sessionRecord.getRemoteIdentityKey().getPublicKey().serialize(), idenKey.getPublicKey().serialize())) {
                 signalProtocolStore.deleteSession(consumerAddress);
-                handleRetrySendMessage(message, consumer, sendMessageResponse.subscribedToAdMessages(), messageType);
+                handleRetrySendMessage(message, consumer, sendMessageResponse.subscribedToAdMessages());
             }
         } catch (Exception e) {
             logger.error("Exception happened when trying to send message! {}", e.getMessage(), e);
@@ -75,10 +74,10 @@ public class SekretessManager {
     }
 
     public void sendMessageToConsumer(String message, String consumer) throws SessionCreationException, MessageSendException, PrekeyBundleException {
-        this.sendMessage(message, consumer, MessageType.PRIVATE);
+        this.sendMessage(message, consumer);
     }
 
-    private void handleRetrySendMessage(String message, String consumer, boolean isSubscribedToAdMessages, MessageType messageType) throws PrekeyBundleException {
+    private void handleRetrySendMessage(String message, String consumer, boolean isSubscribedToAdMessages) throws PrekeyBundleException {
         logger.info("Received to retry message to consumer: {}", consumer);
         SignalProtocolAddress consumerAddress = new SignalProtocolAddress(consumer, 123);
         SessionBuilder sessionBuilder = new SessionBuilder(signalProtocolStore, consumerAddress);
@@ -96,7 +95,7 @@ public class SekretessManager {
         try {
             CiphertextMessage ciphertextMessage = sessionCipher.encrypt(message.getBytes());
             PreKeySignalMessage signalMessage = new PreKeySignalMessage(ciphertextMessage.serialize());
-            sekretessServerClient.sendMessage(Base64.getEncoder().encodeToString(signalMessage.serialize()), consumer, messageType.name());
+            sekretessServerClient.sendMessage(Base64.getEncoder().encodeToString(signalMessage.serialize()), consumer);
         } catch (Exception e) {
             logger.error("Exception happened when trying to send message! {}", e.getMessage(), e);
         }
@@ -117,7 +116,31 @@ public class SekretessManager {
             } else {
                 throw new RuntimeException("Group session not found for business!");
             }
-            sendMessage(Base64.getEncoder().encodeToString(sentBusinessDistributionMessage.serialize()), consumer, MessageType.KEY_DIST);
+
+            SignalProtocolAddress consumerAddress = new SignalProtocolAddress(consumer, 123);
+            SessionRecord sessionRecord = signalProtocolStore.loadSession(consumerAddress);
+            if (sessionRecord == null) {
+                logger.info("No session available for consumer: {}", consumer);
+                SessionBuilder sessionBuilder = new SessionBuilder(signalProtocolStore, consumerAddress);
+                PreKeyBundle consumerPrekeyBundle = getConsumerPrekeyBundle(consumer);
+                try {
+                    sessionBuilder.process(consumerPrekeyBundle);
+                    sessionRecord = signalProtocolStore.loadSession(consumerAddress);
+                } catch (InvalidKeyException | UntrustedIdentityException e) {
+                    throw new SessionCreationException("Exception happened when trying to create session with consumer: " + consumer + " , " + e.getMessage());
+                }
+            }
+
+            SessionCipher sessionCipher = new SessionCipher(signalProtocolStore, consumerAddress);
+            try {
+                CiphertextMessage ciphertextMessage = sessionCipher.encrypt(Base64.getEncoder().encodeToString(sentBusinessDistributionMessage.serialize()).getBytes());
+                PreKeySignalMessage signalMessage = new PreKeySignalMessage(ciphertextMessage.serialize());
+                sekretessServerClient.sendKeyDistMessage(Base64.getEncoder().encodeToString(signalMessage.serialize()), consumer);
+
+            } catch (Exception e) {
+                logger.error("Exception happened when trying to send message! {}", e.getMessage(), e);
+                throw new MessageSendException("Exception happened when trying to send message! " + e.getMessage());
+            }
 
         } catch (Exception e) {
             logger.error("Exception happened when trying to send senderkeydistribution message! {}", e.getMessage(), e);
