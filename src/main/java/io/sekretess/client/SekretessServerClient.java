@@ -20,7 +20,7 @@ import java.util.List;
 
 public class SekretessServerClient {
     private final HttpClient httpClient;
-    private final String businessServerUrl = System.getenv("SEKRETESS_BUSINESS_SERVER_URL");
+    private final String businessServerUrl;
     private final TokenProvider tokenProvider;
     private static final Logger logger = LoggerFactory.getLogger(SekretessServerClient.class);
 
@@ -28,6 +28,14 @@ public class SekretessServerClient {
     public SekretessServerClient() {
         this.httpClient = HttpClient.newBuilder().build();
         this.tokenProvider = new TokenProvider();
+        this.businessServerUrl = System.getenv("SEKRETESS_BUSINESS_SERVER_URL");
+    }
+
+    // Package-private constructor for testing
+    SekretessServerClient(HttpClient httpClient, TokenProvider tokenProvider, String businessServerUrl) {
+        this.httpClient = httpClient;
+        this.tokenProvider = tokenProvider;
+        this.businessServerUrl = businessServerUrl;
     }
 
     public SendMessageResponse sendMessage(String text, String consumer) throws IOException, InterruptedException {
