@@ -28,6 +28,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Set up Java 21
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
       # Build the Spring Boot application
       - name: Build Spring Boot Application
         run: |
