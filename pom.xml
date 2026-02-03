@@ -6,6 +6,7 @@
     <version>1.2.2-SNAPSHOT</version>
     <name>business-java-sdk</name>
     <description>SDK for businesses to send encrypted messages</description>
+    <url>https://github.com/sekretess/business-java-sdk</url>
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
