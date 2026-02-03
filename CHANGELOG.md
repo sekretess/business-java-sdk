@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/sekretess/business-java-sdk/compare/v1.1.2...v1.1.3) (2026-02-03)
+
+
+### Bug Fixes
+
+* add env variable ([93a5ae6](https://github.com/sekretess/business-java-sdk/commit/93a5ae6395c75e7d6220980a9a281745fa645b84))
+
 ## [1.1.2](https://github.com/sekretess/business-java-sdk/compare/v1.1.1...v1.1.2) (2026-02-03)
 
 
