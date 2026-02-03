@@ -20,8 +20,8 @@ jobs:
           distribution: temurin
           java-version: '21'
           server-id: central
-          server-username: ${{ secrets.CENTRAL_USERNAME }}
-          server-password: ${{ secrets.CENTRAL_TOKEN }}
+          server-username: CENTRAL_USERNAME
+          server-password: CENTRAL_TOKEN
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
@@ -29,3 +29,5 @@ jobs:
         run: mvn -B clean deploy
         env:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
