@@ -12,11 +12,17 @@ This SDK provides a secure, Signal-based messaging client that allows businesses
 - **Token-based Authentication**: Mutual TLS authentication with automatic token refresh
 - **Persistent Store**: Extensible storage interfaces for identity keys, sessions, and group data
 
-## Project Coordinates
+## Maven Dependency
 
-- **GroupId**: `io.sekretess`
-- **ArtifactId**: `business-java-sdk`
-- **Version**: `1.0-SNAPSHOT`
+```xml
+<dependency>
+    <groupId>io.sekretess</groupId>
+    <artifactId>business-java-sdk</artifactId>
+    <version>${sekretess.version}</version>
+</dependency>
+```
+
+> **Note**: Replace `${sekretess.version}` with the latest version available on [Maven Central](https://central.sonatype.com/artifact/io.sekretess/business-java-sdk).
 
 ## Requirements
 
@@ -57,6 +63,95 @@ public interface GroupSessionStore {
     GroupSessionData loadGroupSession(String name);
 }
 ```
+
+#### In-Memory Store Implementations (for testing)
+
+Here are minimal in-memory implementations for testing:
+
+**InMemoryIdentityStore**
+```java
+import io.sekretess.store.IdentityStore;
+import io.sekretess.model.IdentityKeyData;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class InMemoryIdentityStore implements IdentityStore {
+    private final Map<String, IdentityKeyData> identities = new HashMap<>();
+
+    @Override
+    public IdentityKeyData loadIdentity(String username) {
+        return identities.get(username);
+    }
+
+    @Override
+    public void saveIdentity(String username, byte[] serializedIdentityKeyPair, int registrationId) {
+        identities.put(username, new IdentityKeyData(username, serializedIdentityKeyPair, registrationId));
+    }
+}
+```
+
+**InMemorySessionStore**
+```java
+import io.sekretess.store.SessionStore;
+import io.sekretess.model.SessionData;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class InMemorySessionStore implements SessionStore {
+    private final Map<String, SessionData> store = new HashMap<>();
+
+    @Override
+    public void saveSession(String name, int deviceId, String base64EncodedRecord) {
+        store.put(name, new SessionData(name, deviceId, base64EncodedRecord));
+    }
+
+    @Override
+    public List<SessionData> loadAll() {
+        return new ArrayList<>(store.values());
+    }
+
+    @Override
+    public void deleteSession(String name) {
+        store.remove(name);
+    }
+}
+```
+
+**InMemoryGroupSessionStore**
+```java
+import io.sekretess.store.GroupSessionStore;
+import io.sekretess.model.GroupSessionData;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class InMemoryGroupSessionStore implements GroupSessionStore {
+    private final Map<String, GroupSessionData> store = new HashMap<>();
+
+    @Override
+    public void saveGroupSession(String name, int deviceId, String distributionId, String sessionRecord) {
+        GroupSessionData existing = store.get(name);
+        String existingDistMessage = existing != null ? existing.businessDistributionMessage() : null;
+        store.put(name, new GroupSessionData(name, deviceId, distributionId, sessionRecord, existingDistMessage));
+    }
+
+    @Override
+    public void saveSendDistributionMessage(String name, int deviceId, String distributionId, String businessDistributionMessage) {
+        store.put(name, new GroupSessionData(name, deviceId, distributionId, null, businessDistributionMessage));
+    }
+
+    @Override
+    public GroupSessionData loadGroupSession(String name) {
+        return store.get(name);
+    }
+}
+```
+
+> For production use, implement these interfaces backed by a database (PostgreSQL, MySQL, etc.).
 
 ### 2. Use `SekretessManagerFactory` to Initialize
 
@@ -144,30 +239,6 @@ export BUSINESS_USER_NAME=my-business-id
 ```
 
 
-## Store Implementation Example (In-Memory)
-
-Here's a minimal in-memory store implementation for testing:
-
-```java
-import io.sekretess.store.IdentityStore;
-import io.sekretess.model.IdentityKeyData;
-
-public class InMemoryIdentityStore implements IdentityStore {
-    private final Map<String, IdentityKeyData> identities = new HashMap<>();
-
-    @Override
-    public IdentityKeyData loadIdentity(String username) {
-        return identities.get(username);
-    }
-
-    @Override
-    public void saveIdentity(String username, byte[] serializedIdentityKeyPair, int registrationId) {
-        identities.put(username, new IdentityKeyData(username, serializedIdentityKeyPair, registrationId));
-    }
-}
-```
-
-Implement `SessionStore` and `GroupSessionStore` similarly, typically backed by a database (PostgreSQL, MySQL, etc.) for production use.
 
 ## Build
 
