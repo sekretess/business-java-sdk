@@ -161,24 +161,40 @@ The **only supported way** to create a `SekretessManager` is through `SekretessM
 import io.sekretess.manager.SekretessManagerFactory;
 import io.sekretess.manager.SekretessManager;
 
-// Create your store implementations (database, cache, etc.)
-IdentityStore identityStore = new YourIdentityStoreImpl();
-SessionStore sessionStore = new YourSessionStoreImpl();
-GroupSessionStore groupSessionStore = new YourGroupSessionStoreImpl();
+import java.util.Scanner;
 
-try {
-    // Initialize manager through factory - this sets up Signal protocol and stores
-    SekretessManager manager = SekretessManagerFactory.createSekretessManager(
-        identityStore,
-        sessionStore,
-        groupSessionStore
-    );
-    
-    // Now you can send messages
-    manager.sendMessageToConsumer("Hello, consumer!", "consumer-id-123");
-    
-} catch (Exception e) {
-    e.printStackTrace();
+public class MessagingExample {
+    public static void main(String[] args) {
+        // Using in-memory stores - note: sessions are lost when the application stops.
+        // Keep the application running to maintain active sessions.
+        // For production, use persistent database-backed stores.
+        IdentityStore identityStore = new InMemoryIdentityStore();
+        SessionStore sessionStore = new InMemorySessionStore();
+        GroupSessionStore groupSessionStore = new InMemoryGroupSessionStore();
+
+        try {
+            SekretessManager manager = SekretessManagerFactory.createSekretessManager(
+                identityStore,
+                sessionStore,
+                groupSessionStore
+            );
+
+            // 2.1 Send a private message to a specific consumer
+            manager.sendMessageToConsumer("Hello, consumer!", "consumer-id-123");
+
+            // 2.2 Send advertisement messages (keeps session alive)
+            Scanner scanner = new Scanner(System.in);
+            while (true) {
+                System.out.println("Press Enter to send an advertisement message...");
+                scanner.nextLine();
+                manager.sendAdsMessage("test");
+                System.out.println("Advertisement message sent!");
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }
 ```
 
@@ -264,4 +280,4 @@ This project is licensed under the GNU Affero General Public License v3.0 (AGPL-
 
 ## Support
 
-For issues, questions, or contributions, please refer to the project repository or contact the development team.
+For issues or questions, please create an issue in the [GitHub repository](https://github.com/sekretess/business-java-sdk/issues). For contributions, please submit a Pull Request.
