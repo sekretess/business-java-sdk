@@ -21,7 +21,7 @@ public class MyClass {
                     sessionStore,
                     groupSessionStore
             );
-            manager.sendMessageToConsumer("Hello, newbusiness!", "elnura");
+            manager.sendMessageToConsumer("Hello, newbusiness!", "some-user");
             // For broadcasting
 //            while(true){
 //                Scanner scanner = new Scanner(System.in);
