@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.2.3](https://github.com/sekretess/business-java-sdk/compare/v1.2.2...v1.2.3) (2026-03-26)
+
+
+### Bug Fixes
+
+* update release ([08e886e](https://github.com/sekretess/business-java-sdk/commit/08e886e64abe2f43fcf156abff9743ee29c9cf90))
+* update release ([c2e3783](https://github.com/sekretess/business-java-sdk/commit/c2e37831a9d1ac2f9d62a137ec2ed6377cfcafc4))
+
+
+### Documentation
+
+* update readme ([d380282](https://github.com/sekretess/business-java-sdk/commit/d380282dfff580d75df2123924305a2a4a624a39))
+* update readme ([24ae501](https://github.com/sekretess/business-java-sdk/commit/24ae501c5a40639e78e041d541044dbb39623ff1))
+* update README ([d9d191c](https://github.com/sekretess/business-java-sdk/commit/d9d191c3bd26b47a3459503c48145473e93155a4))
+* update README ([3ab130f](https://github.com/sekretess/business-java-sdk/commit/3ab130f2c77e0fac2fa17ec7ba8ab0a5ea39941c))
+
 ## [1.2.2](https://github.com/sekretess/business-java-sdk/compare/v1.2.1...v1.2.2) (2026-02-03)
 
 
