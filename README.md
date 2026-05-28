@@ -245,12 +245,17 @@ The SDK uploads only ciphertext to `business-server`. The file key and IV stay i
 
 ## Environment Configuration
 
-The SDK reads the following environment variables at runtime:
+`SEKRETESS_AUTH_MODE` is required and must be set to one of the supported values. Depending on the mode, different additional variables are required.
+
+### mTLS mode (`SEKRETESS_AUTH_MODE=mtls`)
+
+Authenticates to the identity provider using a client certificate (mTLS) to obtain a Bearer token.
 
 | Variable | Purpose |
 |----------|---------|
-| `SEKRETESS_BUSINESS_SERVER_URL` | Business server URL (used for sending messages) |
-| `IDENTITY_PROVIDER_URL` | Identity provider token endpoint (for authentication) |
+| `SEKRETESS_AUTH_MODE` | Set to `mtls` |
+| `SEKRETESS_BUSINESS_SERVER_URL` | Business server URL |
+| `IDENTITY_PROVIDER_URL` | Identity provider token endpoint |
 | `USER_CERTIFICATE_PATH` | Path to client X.509 certificate (PEM/DER) |
 | `USER_CERTIFICATE_KEY` | Path to client private key (PEM, may be encrypted) |
 | `USER_CERTIFICATE_PASSWORD` | Password for encrypted private key |
@@ -258,11 +263,33 @@ The SDK reads the following environment variables at runtime:
 
 Example:
 ```bash
+export SEKRETESS_AUTH_MODE=mtls
 export SEKRETESS_BUSINESS_SERVER_URL=https://business.sekretess.io
 export IDENTITY_PROVIDER_URL=https://idp.example.com/token
 export USER_CERTIFICATE_PATH=/path/to/cert.pem
 export USER_CERTIFICATE_KEY=/path/to/key.pem
 export USER_CERTIFICATE_PASSWORD=my-key-password
+export BUSINESS_USER_NAME=my-business-id
+```
+
+### API Key mode (`SEKRETESS_AUTH_MODE=api_key`)
+
+Authenticates using an API key and secret sent as HTTP Basic credentials (`Authorization: Basic base64(apiKey:apiSecret)`).
+
+| Variable | Purpose |
+|----------|---------|
+| `SEKRETESS_AUTH_MODE` | Set to `api_key` |
+| `SEKRETESS_BUSINESS_SERVER_URL` | Business server URL |
+| `SEKRETESS_API_KEY` | API key issued by Sekretess |
+| `SEKRETESS_API_SECRET` | API secret issued by Sekretess |
+| `BUSINESS_USER_NAME` | Business identifier (used as local Signal protocol address) |
+
+Example:
+```bash
+export SEKRETESS_AUTH_MODE=api_key
+export SEKRETESS_BUSINESS_SERVER_URL=https://business.sekretess.io
+export SEKRETESS_API_KEY=your-api-key
+export SEKRETESS_API_SECRET=your-api-secret
 export BUSINESS_USER_NAME=my-business-id
 ```
 

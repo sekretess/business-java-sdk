@@ -19,27 +19,85 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
 public class SekretessServerClient {
-    private final HttpClient httpClient;
-    private final String businessServerUrl;
-    private final TokenProvider tokenProvider;
-    private static final Logger logger = LoggerFactory.getLogger(SekretessServerClient.class);
 
-
-    public SekretessServerClient() {
-        this.httpClient = HttpClient.newBuilder().build();
-        this.tokenProvider = new TokenProvider();
-        this.businessServerUrl = System.getenv("SEKRETESS_BUSINESS_SERVER_URL");
+    public enum AuthMode {
+        MTLS, API_KEY
     }
 
-    // Package-private constructor for testing
+    private final HttpClient httpClient;
+    private final String businessServerUrl;
+    private final AuthMode authMode;
+    private final TokenProvider tokenProvider;
+    private final String apiKeyCredentials;
+    private static final Logger logger = LoggerFactory.getLogger(SekretessServerClient.class);
+
+    public SekretessServerClient() {
+        this.businessServerUrl = System.getenv("SEKRETESS_BUSINESS_SERVER_URL");
+        this.authMode = resolveAuthMode(System.getenv("SEKRETESS_AUTH_MODE"));
+        this.httpClient = HttpClient.newBuilder().build();
+
+        if (this.authMode == AuthMode.MTLS) {
+            this.tokenProvider = new TokenProvider();
+            this.apiKeyCredentials = null;
+        } else {
+            String apiKey = System.getenv("SEKRETESS_API_KEY");
+            String apiSecret = System.getenv("SEKRETESS_API_SECRET");
+            if (apiKey == null || apiKey.isBlank() || apiSecret == null || apiSecret.isBlank()) {
+                throw new IllegalStateException(
+                        "SEKRETESS_API_KEY and SEKRETESS_API_SECRET are required when SEKRETESS_AUTH_MODE=api_key");
+            }
+            this.tokenProvider = null;
+            this.apiKeyCredentials = Base64.getEncoder()
+                    .encodeToString((apiKey + ":" + apiSecret).getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    // Package-private constructor for testing (mtls mode)
     SekretessServerClient(HttpClient httpClient, TokenProvider tokenProvider, String businessServerUrl) {
         this.httpClient = httpClient;
         this.tokenProvider = tokenProvider;
         this.businessServerUrl = businessServerUrl;
+        this.authMode = AuthMode.MTLS;
+        this.apiKeyCredentials = null;
+    }
+
+    // Package-private constructor for testing (api_key mode)
+    SekretessServerClient(HttpClient httpClient, String apiKey, String apiSecret, String businessServerUrl) {
+        if (apiKey == null || apiKey.isBlank() || apiSecret == null || apiSecret.isBlank()) {
+            throw new IllegalArgumentException(
+                    "apiKey and apiSecret must not be blank");
+        }
+        this.httpClient = httpClient;
+        this.tokenProvider = null;
+        this.businessServerUrl = businessServerUrl;
+        this.authMode = AuthMode.API_KEY;
+        this.apiKeyCredentials = Base64.getEncoder()
+                .encodeToString((apiKey + ":" + apiSecret).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static AuthMode resolveAuthMode(String authModeEnv) {
+        if (authModeEnv == null || authModeEnv.isBlank()) {
+            throw new IllegalStateException(
+                    "SEKRETESS_AUTH_MODE environment variable is required. Supported values: 'mtls', 'api_key'");
+        }
+        return switch (authModeEnv.toLowerCase().replace("-", "_")) {
+            case "mtls" -> AuthMode.MTLS;
+            case "api_key" -> AuthMode.API_KEY;
+            default -> throw new IllegalStateException(
+                    "Unsupported SEKRETESS_AUTH_MODE: '" + authModeEnv + "'. Supported values: 'mtls', 'api_key'");
+        };
+    }
+
+    private HttpRequest.Builder withAuthentication(HttpRequest.Builder builder) {
+        if (authMode == AuthMode.API_KEY) {
+            return builder.header("Authorization", "Basic " + apiKeyCredentials);
+        }
+        return builder.header("Authorization", "Bearer " + tokenProvider.fetchToken());
     }
 
     public SendMessageResponse sendMessage(String text, String consumer) throws IOException, InterruptedException {
@@ -51,11 +109,10 @@ public class SekretessServerClient {
     }
 
     public void sendKeyDistMessage(String text, String consumer) throws IOException, InterruptedException {
-        HttpRequest httpRequest = HttpRequest.newBuilder()
+        HttpRequest httpRequest = withAuthentication(HttpRequest.newBuilder()
                 .POST(HttpRequest.BodyPublishers.ofString(new Gson().toJson(new SendMessage(text, consumer))))
                 .uri(URI.create(businessServerUrl + "/api/v1/businesses/messages/distributions"))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + tokenProvider.fetchToken())
+                .header("Content-Type", "application/json"))
                 .build();
 
         HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
@@ -67,11 +124,10 @@ public class SekretessServerClient {
     }
 
     public List<SendAdsMessageResponse> sendAdsMessage(String text, String exchangeName) throws IOException, InterruptedException {
-        HttpRequest httpRequest = HttpRequest.newBuilder()
+        HttpRequest httpRequest = withAuthentication(HttpRequest.newBuilder()
                 .POST(HttpRequest.BodyPublishers.ofString(new Gson().toJson(new SendAdMessage(text, exchangeName))))
                 .uri(URI.create(businessServerUrl + "/api/v1/businesses/messages/ads"))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + tokenProvider.fetchToken())
+                .header("Content-Type", "application/json"))
                 .build();
 
         HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
@@ -86,11 +142,10 @@ public class SekretessServerClient {
     }
 
     public ConsumerKeysResponse getConsumerKeys(String consumer) throws IOException, InterruptedException {
-        HttpRequest httpRequest = HttpRequest.newBuilder()
+        HttpRequest httpRequest = withAuthentication(HttpRequest.newBuilder()
                 .GET()
                 .uri(URI.create(businessServerUrl + "/api/v1/businesses/consumers/" + consumer + "/key-bundles"))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + tokenProvider.fetchToken())
+                .header("Content-Type", "application/json"))
                 .build();
         HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() == 200) {
@@ -114,7 +169,7 @@ public class SekretessServerClient {
                 + "Content-Type: application/octet-stream\r\n\r\n";
         String closingBoundary = "\r\n--" + boundary + "--\r\n";
 
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpRequest request = withAuthentication(HttpRequest.newBuilder()
                 .POST(HttpRequest.BodyPublishers.concat(
                         HttpRequest.BodyPublishers.ofByteArray(consumerPart.getBytes(StandardCharsets.UTF_8)),
                         HttpRequest.BodyPublishers.ofByteArray(filePartHeader.getBytes(StandardCharsets.UTF_8)),
@@ -122,8 +177,7 @@ public class SekretessServerClient {
                         HttpRequest.BodyPublishers.ofByteArray(closingBoundary.getBytes(StandardCharsets.UTF_8))
                 ))
                 .uri(URI.create(businessServerUrl + "/api/v1/businesses/uploads"))
-                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
-                .header("Authorization", "Bearer " + tokenProvider.fetchToken())
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary))
                 .build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -136,11 +190,10 @@ public class SekretessServerClient {
     }
 
     private SendMessageResponse sendMessageToPath(String path, String text, String consumer) throws IOException, InterruptedException {
-        HttpRequest httpRequest = HttpRequest.newBuilder()
+        HttpRequest httpRequest = withAuthentication(HttpRequest.newBuilder()
                 .POST(HttpRequest.BodyPublishers.ofString(new Gson().toJson(new SendMessage(text, consumer))))
                 .uri(URI.create(businessServerUrl + path))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + tokenProvider.fetchToken())
+                .header("Content-Type", "application/json"))
                 .build();
 
         HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());

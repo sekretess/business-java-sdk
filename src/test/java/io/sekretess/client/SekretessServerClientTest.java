@@ -5,6 +5,7 @@ import io.sekretess.client.response.FileUploadResponse;
 import io.sekretess.client.response.SendAdsMessageResponse;
 import io.sekretess.client.response.SendMessageResponse;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,8 +17,10 @@ import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
@@ -407,5 +410,99 @@ class SekretessServerClientTest {
 
         // Assert - verify httpClient was called (request details are internal)
         verify(httpClient).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    // ==================== API Key Auth Mode Tests ====================
+
+    @Nested
+    class ApiKeyAuthModeTests {
+
+        private static final String TEST_API_KEY = "my-api-key";
+        private static final String TEST_API_SECRET = "my-api-secret";
+        private static final String EXPECTED_BASIC_HEADER = "Basic " + Base64.getEncoder()
+                .encodeToString((TEST_API_KEY + ":" + TEST_API_SECRET).getBytes(StandardCharsets.UTF_8));
+
+        private SekretessServerClient apiKeyClient;
+
+        @BeforeEach
+        void setUp() {
+            apiKeyClient = new SekretessServerClient(httpClient, TEST_API_KEY, TEST_API_SECRET, TEST_SERVER_URL);
+        }
+
+        @Test
+        void sendMessage_SendsBasicAuthHeader_InApiKeyMode() throws Exception {
+            when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenReturn(httpResponse);
+            when(httpResponse.statusCode()).thenReturn(200);
+            when(httpResponse.body()).thenReturn("{\"userIK\":\"ik\",\"subscribedToAdMessages\":false}");
+
+            apiKeyClient.sendMessage("hello", "consumer");
+
+            ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
+            verify(httpClient).send(captor.capture(), any(HttpResponse.BodyHandler.class));
+            assertThat(captor.getValue().headers().firstValue("Authorization"))
+                    .hasValue(EXPECTED_BASIC_HEADER);
+        }
+
+        @Test
+        void sendMessage_DoesNotUseTokenProvider_InApiKeyMode() throws Exception {
+            when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenReturn(httpResponse);
+            when(httpResponse.statusCode()).thenReturn(200);
+            when(httpResponse.body()).thenReturn("{\"userIK\":\"ik\",\"subscribedToAdMessages\":false}");
+
+            apiKeyClient.sendMessage("hello", "consumer");
+
+            verifyNoInteractions(tokenProvider);
+        }
+
+        @Test
+        void sendAdsMessage_SendsBasicAuthHeader_InApiKeyMode() throws Exception {
+            when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenReturn(httpResponse);
+            when(httpResponse.statusCode()).thenReturn(202);
+            when(httpResponse.body()).thenReturn("[]");
+
+            apiKeyClient.sendAdsMessage("ad", "exchange");
+
+            ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
+            verify(httpClient).send(captor.capture(), any(HttpResponse.BodyHandler.class));
+            assertThat(captor.getValue().headers().firstValue("Authorization"))
+                    .hasValue(EXPECTED_BASIC_HEADER);
+        }
+
+        @Test
+        void getConsumerKeys_SendsBasicAuthHeader_InApiKeyMode() throws Exception {
+            String responseBody = """
+                    {
+                        "username": "c1", "ik": "ik", "opk": "1:opk",
+                        "spkSignature": "sig", "spk": "spk", "spkID": "1",
+                        "pqSpk": "pqspk", "pqSpkID": "2", "pqSpkSignature": "pqsig", "regID": 1
+                    }
+                    """;
+            when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenReturn(httpResponse);
+            when(httpResponse.statusCode()).thenReturn(200);
+            when(httpResponse.body()).thenReturn(responseBody);
+
+            apiKeyClient.getConsumerKeys("c1");
+
+            ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
+            verify(httpClient).send(captor.capture(), any(HttpResponse.BodyHandler.class));
+            assertThat(captor.getValue().headers().firstValue("Authorization"))
+                    .hasValue(EXPECTED_BASIC_HEADER);
+        }
+
+        @Test
+        void constructor_ThrowsIllegalStateException_WhenApiKeyIsBlank() {
+            assertThatThrownBy(() -> new SekretessServerClient(httpClient, "", TEST_API_SECRET, TEST_SERVER_URL))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        void constructor_ThrowsIllegalStateException_WhenApiSecretIsBlank() {
+            assertThatThrownBy(() -> new SekretessServerClient(httpClient, TEST_API_KEY, "", TEST_SERVER_URL))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
     }
 }
