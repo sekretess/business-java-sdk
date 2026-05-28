@@ -1,11 +1,14 @@
 package io.sekretess.client;
 
 import io.sekretess.client.response.ConsumerKeysResponse;
+import io.sekretess.client.response.FileUploadResponse;
 import io.sekretess.client.response.SendAdsMessageResponse;
 import io.sekretess.client.response.SendMessageResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -13,6 +16,8 @@ import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
@@ -21,6 +26,9 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SekretessServerClientTest {
+
+    @TempDir
+    Path tempDir;
 
     @Mock
     private HttpClient httpClient;
@@ -151,6 +159,66 @@ class SekretessServerClientTest {
         assertThatThrownBy(() -> serverClient.sendKeyDistMessage("key-dist", "consumer"))
                 .isInstanceOf(IOException.class)
                 .hasMessage("Connection refused");
+    }
+
+    // ==================== sendFileMessage Tests ====================
+
+    @Test
+    void sendFileMessage_ReturnsResponse_WhenStatusIs200() throws Exception {
+        when(tokenProvider.fetchToken()).thenReturn("test-token");
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(httpResponse);
+        when(httpResponse.statusCode()).thenReturn(200);
+        when(httpResponse.body()).thenReturn("{\"userIK\":\"test-ik\",\"subscribedToAdMessages\":false}");
+
+        SendMessageResponse response = serverClient.sendFileMessage("encrypted-file-metadata", "test-consumer");
+
+        assertThat(response).isNotNull();
+        assertThat(response.userIK()).isEqualTo("test-ik");
+        assertThat(response.subscribedToAdMessages()).isFalse();
+    }
+
+    // ==================== uploadFile Tests ====================
+
+    @Test
+    void uploadFile_ReturnsResponse_WhenStatusIs200() throws Exception {
+        Path encryptedFile = tempDir.resolve("encrypted.bin");
+        Files.writeString(encryptedFile, "ciphertext");
+
+        when(tokenProvider.fetchToken()).thenReturn("test-token");
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(httpResponse);
+        when(httpResponse.statusCode()).thenReturn(200);
+        when(httpResponse.body()).thenReturn("{\"fileId\":\"file-123\",\"fileToken\":\"signed-token\",\"expiresAt\":\"2026-01-01T00:00:00Z\"}");
+
+        FileUploadResponse response = serverClient.uploadFile(encryptedFile, "test-consumer");
+
+        assertThat(response.fileId()).isEqualTo("file-123");
+        assertThat(response.fileToken()).isEqualTo("signed-token");
+        assertThat(response.expiresAt()).isEqualTo("2026-01-01T00:00:00Z");
+
+        ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        HttpRequest request = requestCaptor.getValue();
+        assertThat(request.uri().toString()).isEqualTo(TEST_SERVER_URL + "/api/v1/businesses/uploads");
+        assertThat(request.headers().firstValue("Content-Type"))
+                .hasValueSatisfying(contentType -> assertThat(contentType).contains("multipart/form-data; boundary="));
+    }
+
+    @Test
+    void uploadFile_ThrowsRuntimeException_WhenStatusIsNot200() throws Exception {
+        Path encryptedFile = tempDir.resolve("encrypted.bin");
+        Files.writeString(encryptedFile, "ciphertext");
+
+        when(tokenProvider.fetchToken()).thenReturn("test-token");
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(httpResponse);
+        when(httpResponse.statusCode()).thenReturn(500);
+
+        assertThatThrownBy(() -> serverClient.uploadFile(encryptedFile, "test-consumer"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Failed to upload encrypted file")
+                .hasMessageContaining("500");
     }
 
     // ==================== sendAdsMessage Tests ====================
@@ -341,4 +409,3 @@ class SekretessServerClientTest {
         verify(httpClient).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 }
-

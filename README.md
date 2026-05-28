@@ -228,8 +228,20 @@ High-level API for sending encrypted messages.
 **Public Methods**:
 
 - `void sendMessageToConsumer(String message, String consumer)` — Send a private message to a consumer (automatically creates sessions if needed, encrypts using Signal protocol)
+- `void sendFileToConsumer(Path filePath, String consumer)` — Encrypt a file with AES-256-GCM, upload ciphertext to the business server, then send Signal-encrypted file metadata to the consumer
 - `void sendAdsMessage(String message)` — Send an advertisement message to all subscribers
 - `void deleteUserSession(String user)` — Delete a consumer session (used when revoking access or resetting)
+
+### File Transfer
+
+`sendFileToConsumer(...)` uses:
+
+- AES-256-GCM for file encryption
+- a fresh 32-byte random key per file
+- a fresh 12-byte random IV per file
+- SHA-256 over the ciphertext
+
+The SDK uploads only ciphertext to `business-server`. The file key and IV stay inside the Signal-encrypted metadata message that is delivered to the consumer.
 
 ## Environment Configuration
 
