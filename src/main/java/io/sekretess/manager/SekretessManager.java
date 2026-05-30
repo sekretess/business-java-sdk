@@ -1,14 +1,19 @@
 package io.sekretess.manager;
 
+import com.google.gson.Gson;
 import io.sekretess.client.SekretessServerClient;
 import io.sekretess.client.response.ConsumerKeysResponse;
+import io.sekretess.client.response.FileUploadResponse;
 import io.sekretess.client.response.SendAdsMessageResponse;
 import io.sekretess.client.response.SendMessageResponse;
 import io.sekretess.exception.MessageSendException;
 import io.sekretess.exception.PrekeyBundleException;
 import io.sekretess.exception.SessionCreationException;
+import io.sekretess.model.FileMessageData;
 import io.sekretess.model.GroupSessionData;
 import io.sekretess.store.SekretessSignalProtocolStore;
+import io.sekretess.util.EncryptedFilePayload;
+import io.sekretess.util.FileEncryptionUtil;
 import org.signal.libsignal.protocol.*;
 import org.signal.libsignal.protocol.ecc.ECPublicKey;
 import org.signal.libsignal.protocol.groups.GroupCipher;
@@ -21,6 +26,8 @@ import org.signal.libsignal.protocol.state.SessionRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.*;
 
 public class SekretessManager {
@@ -42,7 +49,9 @@ public class SekretessManager {
         this.sekretessServerClient = serverClient;
     }
 
-    private void sendMessage(String message, String consumer) throws SessionCreationException, MessageSendException, PrekeyBundleException {
+    private void sendMessage(String message,
+                             String consumer,
+                             MessageDispatcher messageDispatcher) throws SessionCreationException, MessageSendException, PrekeyBundleException {
         SignalProtocolAddress consumerAddress = new SignalProtocolAddress(consumer, 123);
         SessionRecord sessionRecord = signalProtocolStore.loadSession(consumerAddress);
         if (sessionRecord == null) {
@@ -59,13 +68,13 @@ public class SekretessManager {
 
         SessionCipher sessionCipher = new SessionCipher(signalProtocolStore, consumerAddress);
         try {
-            CiphertextMessage ciphertextMessage = sessionCipher.encrypt(message.getBytes());
+            CiphertextMessage ciphertextMessage = sessionCipher.encrypt(message.getBytes(StandardCharsets.UTF_8));
             PreKeySignalMessage signalMessage = new PreKeySignalMessage(ciphertextMessage.serialize());
-            SendMessageResponse sendMessageResponse = sekretessServerClient.sendMessage(Base64.getEncoder().encodeToString(signalMessage.serialize()), consumer);
+            SendMessageResponse sendMessageResponse = messageDispatcher.send(Base64.getEncoder().encodeToString(signalMessage.serialize()), consumer);
             IdentityKey idenKey = new IdentityKey(Base64.getDecoder().decode(sendMessageResponse.userIK()));
             if (!Arrays.equals(sessionRecord.getRemoteIdentityKey().getPublicKey().serialize(), idenKey.getPublicKey().serialize())) {
                 signalProtocolStore.deleteSession(consumerAddress);
-                handleRetrySendMessage(message, consumer, sendMessageResponse.subscribedToAdMessages());
+                handleRetrySendMessage(message, consumer, sendMessageResponse.subscribedToAdMessages(), messageDispatcher);
             }
         } catch (Exception e) {
             logger.error("Exception happened when trying to send message! {}", e.getMessage(), e);
@@ -74,10 +83,48 @@ public class SekretessManager {
     }
 
     public void sendMessageToConsumer(String message, String consumer) throws SessionCreationException, MessageSendException, PrekeyBundleException {
-        this.sendMessage(message, consumer);
+        this.sendMessage(message, consumer, sekretessServerClient::sendMessage);
     }
 
-    private void handleRetrySendMessage(String message, String consumer, boolean isSubscribedToAdMessages) throws PrekeyBundleException {
+    public void sendFileToConsumer(Path filePath, String consumer) throws SessionCreationException, MessageSendException, PrekeyBundleException {
+        EncryptedFilePayload encryptedFilePayload = null;
+        try {
+            encryptedFilePayload = FileEncryptionUtil.encrypt(filePath);
+            FileUploadResponse uploadResponse = sekretessServerClient.uploadFile(encryptedFilePayload.encryptedFilePath(), consumer);
+            FileMessageData fileMessageData = new FileMessageData(
+                    "file",
+                    "AES-256-GCM",
+                    "SHA-256",
+                    uploadResponse.fileId(),
+                    uploadResponse.fileToken(),
+                    encryptedFilePayload.encodedKey(),
+                    encryptedFilePayload.encodedIv(),
+                    encryptedFilePayload.ciphertextSha256(),
+                    encryptedFilePayload.plaintextSize(),
+                    encryptedFilePayload.ciphertextSize(),
+                    encryptedFilePayload.mimeType()
+            );
+            this.sendMessage(new Gson().toJson(fileMessageData), consumer, sekretessServerClient::sendFileMessage);
+        } catch (MessageSendException | SessionCreationException | PrekeyBundleException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Exception happened when trying to send file! {}", e.getMessage(), e);
+            throw new MessageSendException("Exception happened when trying to send file! " + e.getMessage());
+        } finally {
+            if (encryptedFilePayload != null) {
+                try {
+                    encryptedFilePayload.deleteTempFile();
+                } catch (Exception e) {
+                    logger.warn("Exception happened when deleting temp encrypted file! {}", e.getMessage(), e);
+                }
+            }
+        }
+    }
+
+    private void handleRetrySendMessage(String message,
+                                        String consumer,
+                                        boolean isSubscribedToAdMessages,
+                                        MessageDispatcher messageDispatcher) throws PrekeyBundleException {
         logger.info("Received to retry message to consumer: {}", consumer);
         SignalProtocolAddress consumerAddress = new SignalProtocolAddress(consumer, 123);
         SessionBuilder sessionBuilder = new SessionBuilder(signalProtocolStore, consumerAddress);
@@ -93,9 +140,9 @@ public class SekretessManager {
 
         SessionCipher sessionCipher = new SessionCipher(signalProtocolStore, consumerAddress);
         try {
-            CiphertextMessage ciphertextMessage = sessionCipher.encrypt(message.getBytes());
+            CiphertextMessage ciphertextMessage = sessionCipher.encrypt(message.getBytes(StandardCharsets.UTF_8));
             PreKeySignalMessage signalMessage = new PreKeySignalMessage(ciphertextMessage.serialize());
-            sekretessServerClient.sendMessage(Base64.getEncoder().encodeToString(signalMessage.serialize()), consumer);
+            messageDispatcher.send(Base64.getEncoder().encodeToString(signalMessage.serialize()), consumer);
         } catch (Exception e) {
             logger.error("Exception happened when trying to send message! {}", e.getMessage(), e);
         }
@@ -213,6 +260,11 @@ public class SekretessManager {
         } catch (Exception e) {
             throw new PrekeyBundleException("Exception happened when trying to get consumer prekey bundle: " + consumer + " , " + e.getMessage());
         }
+    }
+
+    @FunctionalInterface
+    private interface MessageDispatcher {
+        SendMessageResponse send(String text, String consumer) throws Exception;
     }
 
 }

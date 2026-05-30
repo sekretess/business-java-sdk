@@ -2,6 +2,7 @@ package io.sekretess.manager;
 
 import io.sekretess.client.SekretessServerClient;
 import io.sekretess.client.response.ConsumerKeysResponse;
+import io.sekretess.client.response.FileUploadResponse;
 import io.sekretess.client.response.SendAdsMessageResponse;
 import io.sekretess.client.response.SendMessageResponse;
 import io.sekretess.exception.MessageSendException;
@@ -12,7 +13,9 @@ import io.sekretess.store.InMemorySessionStore;
 import io.sekretess.store.SekretessSignalProtocolStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.signal.libsignal.protocol.IdentityKey;
@@ -25,6 +28,9 @@ import org.signal.libsignal.protocol.util.KeyHelper;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
@@ -39,6 +45,9 @@ import static org.mockito.Mockito.*;
  */
 @ExtendWith(MockitoExtension.class)
 class SekretessManagerTest {
+
+    @TempDir
+    Path tempDir;
 
     private InMemoryIdentityStore identityStore;
     private InMemorySessionStore sessionStore;
@@ -253,6 +262,61 @@ class SekretessManagerTest {
         // Act & Assert
         assertThatThrownBy(() -> managerWithNoUser.sendAdsMessage("Ad message"))
                 .isInstanceOf(MessageSendException.class);
+    }
+
+    // ==================== sendFileToConsumer Tests ====================
+
+    @Test
+    void sendFileToConsumer_Success_EncryptsUploadsAndSendsFileMessage() throws Exception {
+        String consumer = "file-consumer";
+        String businessName = "test-business";
+        byte[] plaintext = "file-content".getBytes(StandardCharsets.UTF_8);
+        Path filePath = tempDir.resolve("payload.txt");
+        Files.write(filePath, plaintext);
+
+        IdentityKeyPair businessIdentityKeyPair = IdentityKeyPair.generate();
+        int registrationId = KeyHelper.generateRegistrationId(false);
+        SekretessSignalProtocolStore realProtocolStore = new SekretessSignalProtocolStore(
+                businessIdentityKeyPair, registrationId, sessionStore, groupSessionStore
+        );
+        SekretessManager realManager = new SekretessManager(realProtocolStore, mockServerClient);
+        setUserName(realManager, businessName);
+
+        ConsumerKeysResponse consumerKeys = generateValidConsumerKeys(consumer);
+        when(mockServerClient.getConsumerKeys(consumer)).thenReturn(consumerKeys);
+        when(mockServerClient.uploadFile(any(Path.class), eq(consumer)))
+                .thenAnswer(invocation -> {
+                    Path encryptedPath = invocation.getArgument(0);
+                    assertThat(Files.exists(encryptedPath)).isTrue();
+                    assertThat(Files.readAllBytes(encryptedPath)).isNotEqualTo(plaintext);
+                    return new FileUploadResponse("file-123", "signed-token", "2026-01-01T00:00:00Z");
+                });
+        when(mockServerClient.sendFileMessage(anyString(), eq(consumer)))
+                .thenReturn(new SendMessageResponse(consumerKeys.ik(), false));
+
+        ArgumentCaptor<Path> uploadPathCaptor = ArgumentCaptor.forClass(Path.class);
+
+        assertThatNoException().isThrownBy(() -> realManager.sendFileToConsumer(filePath, consumer));
+
+        verify(mockServerClient).uploadFile(uploadPathCaptor.capture(), eq(consumer));
+        verify(mockServerClient).sendFileMessage(anyString(), eq(consumer));
+        assertThat(Files.exists(uploadPathCaptor.getValue())).isFalse();
+    }
+
+    @Test
+    void sendFileToConsumer_ThrowsMessageSendException_WhenUploadFails() throws Exception {
+        Path filePath = tempDir.resolve("payload.txt");
+        Files.writeString(filePath, "file-content");
+
+        ArgumentCaptor<Path> uploadPathCaptor = ArgumentCaptor.forClass(Path.class);
+        when(mockServerClient.uploadFile(uploadPathCaptor.capture(), eq("file-consumer")))
+                .thenThrow(new IOException("upload failed"));
+
+        assertThatThrownBy(() -> manager.sendFileToConsumer(filePath, "file-consumer"))
+                .isInstanceOf(MessageSendException.class)
+                .hasMessageContaining("upload failed");
+
+        assertThat(Files.exists(uploadPathCaptor.getValue())).isFalse();
     }
 
     // ==================== deleteUserSession Edge Cases ====================

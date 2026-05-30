@@ -1,11 +1,15 @@
 package io.sekretess.client;
 
 import io.sekretess.client.response.ConsumerKeysResponse;
+import io.sekretess.client.response.FileUploadResponse;
 import io.sekretess.client.response.SendAdsMessageResponse;
 import io.sekretess.client.response.SendMessageResponse;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -13,6 +17,10 @@ import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Base64;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
@@ -21,6 +29,9 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SekretessServerClientTest {
+
+    @TempDir
+    Path tempDir;
 
     @Mock
     private HttpClient httpClient;
@@ -151,6 +162,66 @@ class SekretessServerClientTest {
         assertThatThrownBy(() -> serverClient.sendKeyDistMessage("key-dist", "consumer"))
                 .isInstanceOf(IOException.class)
                 .hasMessage("Connection refused");
+    }
+
+    // ==================== sendFileMessage Tests ====================
+
+    @Test
+    void sendFileMessage_ReturnsResponse_WhenStatusIs200() throws Exception {
+        when(tokenProvider.fetchToken()).thenReturn("test-token");
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(httpResponse);
+        when(httpResponse.statusCode()).thenReturn(200);
+        when(httpResponse.body()).thenReturn("{\"userIK\":\"test-ik\",\"subscribedToAdMessages\":false}");
+
+        SendMessageResponse response = serverClient.sendFileMessage("encrypted-file-metadata", "test-consumer");
+
+        assertThat(response).isNotNull();
+        assertThat(response.userIK()).isEqualTo("test-ik");
+        assertThat(response.subscribedToAdMessages()).isFalse();
+    }
+
+    // ==================== uploadFile Tests ====================
+
+    @Test
+    void uploadFile_ReturnsResponse_WhenStatusIs200() throws Exception {
+        Path encryptedFile = tempDir.resolve("encrypted.bin");
+        Files.writeString(encryptedFile, "ciphertext");
+
+        when(tokenProvider.fetchToken()).thenReturn("test-token");
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(httpResponse);
+        when(httpResponse.statusCode()).thenReturn(200);
+        when(httpResponse.body()).thenReturn("{\"fileId\":\"file-123\",\"fileToken\":\"signed-token\",\"expiresAt\":\"2026-01-01T00:00:00Z\"}");
+
+        FileUploadResponse response = serverClient.uploadFile(encryptedFile, "test-consumer");
+
+        assertThat(response.fileId()).isEqualTo("file-123");
+        assertThat(response.fileToken()).isEqualTo("signed-token");
+        assertThat(response.expiresAt()).isEqualTo("2026-01-01T00:00:00Z");
+
+        ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        HttpRequest request = requestCaptor.getValue();
+        assertThat(request.uri().toString()).isEqualTo(TEST_SERVER_URL + "/api/v1/businesses/uploads");
+        assertThat(request.headers().firstValue("Content-Type"))
+                .hasValueSatisfying(contentType -> assertThat(contentType).contains("multipart/form-data; boundary="));
+    }
+
+    @Test
+    void uploadFile_ThrowsRuntimeException_WhenStatusIsNot200() throws Exception {
+        Path encryptedFile = tempDir.resolve("encrypted.bin");
+        Files.writeString(encryptedFile, "ciphertext");
+
+        when(tokenProvider.fetchToken()).thenReturn("test-token");
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(httpResponse);
+        when(httpResponse.statusCode()).thenReturn(500);
+
+        assertThatThrownBy(() -> serverClient.uploadFile(encryptedFile, "test-consumer"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Failed to upload encrypted file")
+                .hasMessageContaining("500");
     }
 
     // ==================== sendAdsMessage Tests ====================
@@ -340,5 +411,98 @@ class SekretessServerClientTest {
         // Assert - verify httpClient was called (request details are internal)
         verify(httpClient).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
-}
 
+    // ==================== API Key Auth Mode Tests ====================
+
+    @Nested
+    class ApiKeyAuthModeTests {
+
+        private static final String TEST_API_KEY = "my-api-key";
+        private static final String TEST_API_SECRET = "my-api-secret";
+        private static final String EXPECTED_BASIC_HEADER = "Basic " + Base64.getEncoder()
+                .encodeToString((TEST_API_KEY + ":" + TEST_API_SECRET).getBytes(StandardCharsets.UTF_8));
+
+        private SekretessServerClient apiKeyClient;
+
+        @BeforeEach
+        void setUp() {
+            apiKeyClient = new SekretessServerClient(httpClient, TEST_API_KEY, TEST_API_SECRET, TEST_SERVER_URL);
+        }
+
+        @Test
+        void sendMessage_SendsBasicAuthHeader_InApiKeyMode() throws Exception {
+            when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenReturn(httpResponse);
+            when(httpResponse.statusCode()).thenReturn(200);
+            when(httpResponse.body()).thenReturn("{\"userIK\":\"ik\",\"subscribedToAdMessages\":false}");
+
+            apiKeyClient.sendMessage("hello", "consumer");
+
+            ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
+            verify(httpClient).send(captor.capture(), any(HttpResponse.BodyHandler.class));
+            assertThat(captor.getValue().headers().firstValue("Authorization"))
+                    .hasValue(EXPECTED_BASIC_HEADER);
+        }
+
+        @Test
+        void sendMessage_DoesNotUseTokenProvider_InApiKeyMode() throws Exception {
+            when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenReturn(httpResponse);
+            when(httpResponse.statusCode()).thenReturn(200);
+            when(httpResponse.body()).thenReturn("{\"userIK\":\"ik\",\"subscribedToAdMessages\":false}");
+
+            apiKeyClient.sendMessage("hello", "consumer");
+
+            verifyNoInteractions(tokenProvider);
+        }
+
+        @Test
+        void sendAdsMessage_SendsBasicAuthHeader_InApiKeyMode() throws Exception {
+            when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenReturn(httpResponse);
+            when(httpResponse.statusCode()).thenReturn(202);
+            when(httpResponse.body()).thenReturn("[]");
+
+            apiKeyClient.sendAdsMessage("ad", "exchange");
+
+            ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
+            verify(httpClient).send(captor.capture(), any(HttpResponse.BodyHandler.class));
+            assertThat(captor.getValue().headers().firstValue("Authorization"))
+                    .hasValue(EXPECTED_BASIC_HEADER);
+        }
+
+        @Test
+        void getConsumerKeys_SendsBasicAuthHeader_InApiKeyMode() throws Exception {
+            String responseBody = """
+                    {
+                        "username": "c1", "ik": "ik", "opk": "1:opk",
+                        "spkSignature": "sig", "spk": "spk", "spkID": "1",
+                        "pqSpk": "pqspk", "pqSpkID": "2", "pqSpkSignature": "pqsig", "regID": 1
+                    }
+                    """;
+            when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenReturn(httpResponse);
+            when(httpResponse.statusCode()).thenReturn(200);
+            when(httpResponse.body()).thenReturn(responseBody);
+
+            apiKeyClient.getConsumerKeys("c1");
+
+            ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
+            verify(httpClient).send(captor.capture(), any(HttpResponse.BodyHandler.class));
+            assertThat(captor.getValue().headers().firstValue("Authorization"))
+                    .hasValue(EXPECTED_BASIC_HEADER);
+        }
+
+        @Test
+        void constructor_ThrowsIllegalStateException_WhenApiKeyIsBlank() {
+            assertThatThrownBy(() -> new SekretessServerClient(httpClient, "", TEST_API_SECRET, TEST_SERVER_URL))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        void constructor_ThrowsIllegalStateException_WhenApiSecretIsBlank() {
+            assertThatThrownBy(() -> new SekretessServerClient(httpClient, TEST_API_KEY, "", TEST_SERVER_URL))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+}
