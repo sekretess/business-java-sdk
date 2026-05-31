@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.0](https://github.com/sekretess/business-java-sdk/compare/v1.2.3...v1.3.0) (2026-05-30)
+
+
+### Features
+
+* add file send implementation ([ba6e49b](https://github.com/sekretess/business-java-sdk/commit/ba6e49b2c0c80e493a803c685a914bc87208e9e4))
+* add file send implementation ([a696f27](https://github.com/sekretess/business-java-sdk/commit/a696f27dab12a5af4cef48d627f00f705db6b73d))
+* add implementation to use api key/secret when sending requests ([0c3aa83](https://github.com/sekretess/business-java-sdk/commit/0c3aa834a8be3a430531be19ceab8dad4d333cfb))
+
 ## [1.2.3](https://github.com/sekretess/business-java-sdk/compare/v1.2.2...v1.2.3) (2026-03-26)
 
 
