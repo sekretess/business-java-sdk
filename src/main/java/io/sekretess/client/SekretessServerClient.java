@@ -176,7 +176,7 @@ public class SekretessServerClient {
                         HttpRequest.BodyPublishers.ofFile(encryptedFile),
                         HttpRequest.BodyPublishers.ofByteArray(closingBoundary.getBytes(StandardCharsets.UTF_8))
                 ))
-                .uri(URI.create(businessServerUrl + "/api/v1/businesses/uploads"))
+                .uri(URI.create(businessServerUrl + "/api/v1/businesses/messages/uploads"))
                 .header("Content-Type", "multipart/form-data; boundary=" + boundary))
                 .build();
 
