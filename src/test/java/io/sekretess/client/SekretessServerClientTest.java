@@ -203,7 +203,7 @@ class SekretessServerClientTest {
         ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
         verify(httpClient).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
         HttpRequest request = requestCaptor.getValue();
-        assertThat(request.uri().toString()).isEqualTo(TEST_SERVER_URL + "/api/v1/businesses/uploads");
+        assertThat(request.uri().toString()).isEqualTo(TEST_SERVER_URL + "/api/v1/businesses/messages/uploads");
         assertThat(request.headers().firstValue("Content-Type"))
                 .hasValueSatisfying(contentType -> assertThat(contentType).contains("multipart/form-data; boundary="));
     }
