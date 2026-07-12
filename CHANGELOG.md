@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1](https://github.com/sekretess/business-java-sdk/compare/v1.3.0...v1.3.1) (2026-07-12)
+
+
+### Bug Fixes
+
+* update file upload path ([bbd73f6](https://github.com/sekretess/business-java-sdk/commit/bbd73f69925cd80c8656530535f3b43b667a9c8c))
+* update file upload path ([8fba7db](https://github.com/sekretess/business-java-sdk/commit/8fba7db1589e2c04327f02301b307560795c443a))
+
 ## [1.3.0](https://github.com/sekretess/business-java-sdk/compare/v1.2.3...v1.3.0) (2026-05-30)
 
 
